@@ -1,0 +1,17 @@
+[project]
+name = "semantic-cache"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aioredis>=2.0.1",
+    "anthropic>=0.68.0",
+    "fastapi>=0.116.2",
+    "numpy>=2.3.3",
+    "openai>=1.108.0",
+    "redis>=6.4.0",
+    "scikit-learn>=1.7.2",
+    "sentence-transformers>=5.1.0",
+    "uvicorn>=0.35.0",
+]
