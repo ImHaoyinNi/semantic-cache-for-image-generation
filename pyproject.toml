@@ -1,17 +1,24 @@
 [project]
 name = "semantic-cache"
 version = "0.1.0"
-description = "Add your description here"
+description = "Semantic cache for image generation"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aioredis>=2.0.1",
     "anthropic>=0.68.0",
-    "fastapi>=0.116.2",
-    "numpy>=2.3.3",
+    "diffusers>=0.30.0",
+    "fastapi>=0.104.0",
+    "numpy>=1.24.0",
     "openai>=1.108.0",
+    "pillow>=10.0.0",
     "redis>=6.4.0",
     "scikit-learn>=1.7.2",
     "sentence-transformers>=5.1.0",
-    "uvicorn>=0.35.0",
+    "uvicorn>=0.24.0",
+    "transformers>=4.36.0",
+    "accelerate>=0.25.0",
+    "safetensors>=0.4.0",
+    "pydantic>=2.5.0",
+    "pip>=25.2",
 ]

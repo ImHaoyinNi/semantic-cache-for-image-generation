@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-def get_root_path():
+def get_root_path() -> Path:
     current = Path(__file__).resolve().parent
 
     # Walk up until we find `.venv`
