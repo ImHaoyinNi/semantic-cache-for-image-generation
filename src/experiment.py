@@ -21,15 +21,21 @@ class ImageGenerationExperiments:
             model_path=model_path,
             device="cuda"
         )
+        self.pos_prompt_prefix: str = "masterpiece, best quality, high quality, ultra-detailed,"
         # Prompts
-        self.pos_prompt = """masterpiece, best quality, high quality, ultra-detailed,
+        self.pos_prompt = """
             1girl, black hair, short hair, blue eyes, sexy pose, dynamic pose,
             blue shirt, short sleeve, white mini skirt,
             smiling, looking at viewer, sitting on desk, hold arms,
             bust shot, office, desk,"""
-        self.pos_prompt_2 = """masterpiece, best quality, high quality, ultra-detailed,
+        self.pos_prompt_2 = """
             1girl, blonde hair, long hair, black eyes, sexy pose, dynamic pose,
-            red shirt, black mini skirt,
+            blue shirt, short sleeve, white mini skirt,
+            crying, looking at viewer, sitting on desk, hold arms,
+            bust shot, office, desk,"""
+        self.pos_prompt_3 = """
+            1girl, blonde hair, long hair, black eyes, sexy pose, dynamic pose,
+            red shirt, long sleeve, black mini skirt,
             crying, looking at viewer, sitting on desk, hold arms,
             bust shot, office, desk,"""
         self.negative_prompt = """multiple views, worst quality, low quality, sketch, error, bad anatomy, bad hands, watermark, ugly, distorted, censored, signature, 3D, logo, extra fingers, extra limbs, text,"""
@@ -37,7 +43,7 @@ class ImageGenerationExperiments:
     def text_to_image(self, test_prompt: str):
         try:
             image = self.generator.generate_image(
-                prompt=test_prompt,
+                prompt=self.pos_prompt_prefix + test_prompt,
                 negative_prompt=self.negative_prompt,
                 width=1024,
                 height=1024,
@@ -66,7 +72,7 @@ class ImageGenerationExperiments:
             image = self.generator.generate_image_from_image(
                 init_image=Image.open(init_image),
                 strength=0.8,
-                prompt=test_prompt,
+                prompt=self.pos_prompt_prefix + test_prompt,
                 negative_prompt=self.negative_prompt,
                 num_inference_steps=num_inference_steps,
                 guidance_scale=5.5,
@@ -95,7 +101,7 @@ class ImageGenerationExperiments:
             latents = torch.load(latent_path, weights_only=True)
             print(f"Loaded latents from {latent_path}")
             image = self.generator.generate_image_from_latents(
-                prompt=test_prompt,
+                prompt=self.pos_prompt_prefix + test_prompt,
                 latents=latents,
                 start_step=start_step,
                 negative_prompt=self.negative_prompt,
@@ -126,4 +132,4 @@ if __name__ == "__main__":
     # init_image_path = get_root_path() / "output/text_to_image_1/final_output.png"
     # experiments.image_to_image(experiments.pos_prompt_2, init_image=init_image_path, num_inference_steps=10)
     latent_path = get_root_path() / "output/text_to_image_1/intermediate/step_05.pt"
-    experiments.latent_to_image(experiments.pos_prompt, latent_path=latent_path, start_step=5)
+    experiments.latent_to_image(experiments.pos_prompt_2, latent_path=latent_path, start_step=5)
