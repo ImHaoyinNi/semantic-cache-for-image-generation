@@ -15,7 +15,7 @@ def create_save_images_callback(save_dir: str = "intermediate_images", save_ever
 
                 intermediate_dir = Path(save_dir)
                 intermediate_dir.mkdir(parents=True, exist_ok=True)
-                image.save(intermediate_dir / f"step_{step_index:03d}.png")
+                image.save(intermediate_dir / f"step_{step_index:02d}.png")
         return callback_kwargs
     return save_images_on_step_end
 
@@ -27,9 +27,29 @@ def create_save_latents_callback(save_dir: str = "intermediate_latents", save_ev
             latents = callback_kwargs["latents"]
             intermediate_dir = Path(save_dir)
             intermediate_dir.mkdir(parents=True, exist_ok=True)
-            torch.save(latents.cpu(), intermediate_dir / f"step_{step_index:03d}.pt")
+            torch.save(latents.cpu(), intermediate_dir / f"step_{step_index:02d}.pt")
         return callback_kwargs
     return save_latent_on_step_end
+
+
+def create_save_latents_and_images_callback(save_dir: str = "intermediate_latents", save_every: int = 5):
+    """Create a callback function for saving intermediate latents and images"""
+    def save_latents_and_images_on_step_end(pipe, step_index, timestep, callback_kwargs):
+        if step_index % save_every == 0:
+            latents = callback_kwargs["latents"]
+            intermediate_dir = Path(save_dir)
+            intermediate_dir.mkdir(parents=True, exist_ok=True)
+
+            # Save latents
+            torch.save(latents.cpu(), intermediate_dir / f"step_{step_index:02d}.pt")
+
+            # Save image
+            with torch.no_grad():
+                image = pipe.vae.decode(latents / pipe.vae.config.scaling_factor, return_dict=False)[0]
+                image = pipe.image_processor.postprocess(image, output_type="pil")[0]
+                image.save(intermediate_dir / f"step_{step_index:02d}.png")
+        return callback_kwargs
+    return save_latents_and_images_on_step_end
 
 
 # Backward compatibility - keep old function names

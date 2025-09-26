@@ -163,7 +163,6 @@ cython_debug/
 
 /models/all-mpnet-base-v2/pytorch_model.bin
 /models/all-MiniLM-L6-v2/pytorch_model.bin
-/models/checkpoints/waiNSFWIllustrious_v130.safetensors
-/models/checkpoints/illustAsianCoser_v20.safetensors
 
 /output/
+/models/checkpoints/

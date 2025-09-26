@@ -11,7 +11,8 @@ from PIL import Image
 from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, AutoencoderKL, EulerDiscreteScheduler
 from pathlib import Path
 
-from src.sdxl_pipeline_utils import create_save_images_callback, create_save_latents_callback
+from src.sdxl_pipeline_utils import create_save_images_callback, create_save_latents_callback, \
+    create_save_latents_and_images_callback
 from src.utils import get_root_path
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,7 @@ class SDXLWorkflow:
                 #     save_dir=str(intermediate_path),
                 #     save_every=5
                 # )
-                callback_on_step_end = create_save_latents_callback(
+                callback_on_step_end = create_save_latents_and_images_callback(
                     save_dir=str(intermediate_path),
                     save_every=5
                 )
@@ -139,15 +140,32 @@ class SDXLWorkflow:
             self.pipeline = self.pipeline.to(self.device)
 
         try:
-            logger.info(f"Continuing generation from step {start_step}...")
+            logger.info(f"Continuing generation from step {start_step} out of {num_inference_steps}...")
 
-            # Set up scheduler for remaining steps
-            self.pipeline.scheduler.set_timesteps(num_inference_steps)
-            timesteps = self.pipeline.scheduler.timesteps
+            # Validate input latents
+            if latents is None or not isinstance(latents, torch.Tensor):
+                raise ValueError("Invalid latents: must be a torch.Tensor")
 
-            # Skip already completed steps
-            if start_step > 0:
-                timesteps = timesteps[start_step:]
+            if len(latents.shape) != 4:
+                raise ValueError(f"Invalid latents shape: expected 4D tensor, got {latents.shape}")
+
+            # Ensure proper device and dtype for latents
+            latents = latents.to(device=self.pipeline.device, dtype=self.pipeline.dtype)
+
+            # Set up scheduler to match the original generation process exactly
+            self.pipeline.scheduler.set_timesteps(num_inference_steps, device=self.pipeline.device)
+            all_timesteps = self.pipeline.scheduler.timesteps
+
+            # Calculate remaining timesteps from start_step
+            if start_step >= num_inference_steps:
+                logger.warning(f"start_step ({start_step}) >= num_inference_steps ({num_inference_steps}), decoding directly")
+                timesteps = []
+            elif start_step > 0:
+                # Use the exact same timesteps as the original generation
+                timesteps = all_timesteps[start_step:]
+                logger.info(f"Continuing from timestep {timesteps[0] if len(timesteps) > 0 else 'none'} (step {start_step})")
+            else:
+                timesteps = all_timesteps
 
             callback_on_step_end = None
             if save_intermediate:
@@ -155,11 +173,8 @@ class SDXLWorkflow:
                     intermediate_path = Path(get_root_path()) / "output/intermediate_images"
                 callback_on_step_end = create_save_images_callback(
                     save_dir=str(intermediate_path),
-                    save_every=1
+                    save_every=5
                 )
-
-            # Continue denoising from provided latents
-            latents = latents.to(self.pipeline.device)
 
             # Get text embeddings using the pipeline's encode_prompt method
             prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = (
@@ -179,19 +194,18 @@ class SDXLWorkflow:
                 prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
                 pooled_prompt_embeds = torch.cat([negative_pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
 
-            # Use the pipeline's denoising loop but manually control it
-            # This is a simplified approach that should work better
+            # Continue denoising process
             with torch.no_grad():
                 for i, t in enumerate(timesteps):
                     # Expand latents for classifier-free guidance
                     latent_model_input = torch.cat([latents] * 2) if guidance_scale > 1.0 else latents
                     latent_model_input = self.pipeline.scheduler.scale_model_input(latent_model_input, t)
 
-                    # Get proper dimensions from latents
-                    height = latents.shape[2] * 8  # VAE downscale factor
+                    # Get dimensions from latents (must match original generation exactly)
+                    height = latents.shape[2] * 8  # Standard VAE downscale factor for SDXL
                     width = latents.shape[3] * 8
 
-                    # Create time_ids for SDXL
+                    # Create time_ids for SDXL exactly as in original pipeline
                     time_ids = torch.tensor([[height, width, 0, 0, height, width]], dtype=prompt_embeds.dtype, device=self.pipeline.device)
                     if guidance_scale > 1.0:
                         time_ids = time_ids.repeat(2, 1)
@@ -224,8 +238,9 @@ class SDXLWorkflow:
                         current_step = start_step + i
                         callback_on_step_end(self.pipeline, current_step, t, callback_kwargs)
 
-            # Decode final latents
+            # Decode final latents (latents are already in correct scale from intermediate save)
             with torch.no_grad():
+                # Use the same decoding process as the callback that saved them
                 image = self.pipeline.vae.decode(latents / self.pipeline.vae.config.scaling_factor, return_dict=False)[0]
                 image = self.pipeline.image_processor.postprocess(image, output_type="pil")[0]
 
@@ -240,7 +255,7 @@ class SDXLWorkflow:
                                   prompt: str,
                                   init_image: Image.Image,
                                   negative_prompt: str = "",
-                                  strength: float = 1,
+                                  strength: float = 0.5,
                                   num_inference_steps: int = 20,
                                   guidance_scale: float = 7.5,
                                   save_intermediate: bool = False,
@@ -285,8 +300,8 @@ class SDXLWorkflow:
             callback_on_step_end = None
             if save_intermediate:
                 if intermediate_path is None:
-                    intermediate_path = Path(get_root_path()) / "output/intermediate_images"
-                callback_on_step_end = create_save_images_callback(
+                    intermediate_path = Path(get_root_path()) / "output/image_to_image/intermediate_images"
+                callback_on_step_end = create_save_latents_and_images_callback(
                     save_dir=str(intermediate_path),
                     save_every=5
                 )
